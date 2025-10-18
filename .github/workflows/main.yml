@@ -1,29 +1,52 @@
-name: Build and Analyze with SonarCloud
+name: Build, Analyze, and Deploy React App
 
 on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
 
 jobs:
   build:
-    name: Build and SonarCloud Scan
+    name: Build and Deploy to AWS
     runs-on: ubuntu-latest
 
     steps:
-      # 🧩 Step 1: Checkout source code
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch full history for accurate analysis
+          fetch-depth: 0
 
-      # ⚙️ Step 2: Setup Node.js environment
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      # 📦 Step 3: Install dependencies
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build React app
+        run: npm run build
+
+      - name: Run SonarCloud Scan
+        uses: SonarSource/sonarqube-scan-action@v5.0.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Deploy to S3
+        run: |
+          aws s3 sync ./build s3://${{ secrets.AWS_S3_BUCKET }} --delete
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+
+      - name: Invalidate CloudFront Cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
