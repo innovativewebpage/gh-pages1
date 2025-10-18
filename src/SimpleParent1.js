@@ -13,10 +13,6 @@ function SimpleParent1() {
         setProduct({ ...product, isAvailable: !toggleValue });
     };
 
-    return (
-        <>
-            <SimpleChild1 product={product} toggleFunction={toggleFunction} />
-        </>
-    );
+    return <SimpleChild1 product={product} toggleFunction={toggleFunction} />;
 }
 export default SimpleParent1;
