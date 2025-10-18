@@ -1,5 +1,5 @@
 import React from "react";
-
+import PropTypes from 'prop-types';
 function SimpleChild1({ product, toggleFunction }) {
     return (
         <>
@@ -23,3 +23,12 @@ function SimpleChild1({ product, toggleFunction }) {
 }
 
 export default SimpleChild1;
+SimpleChild1.propTypes = {
+    product: PropTypes.shape({
+        id: PropTypes.number,
+        pName: PropTypes.string,
+        price: PropTypes.number,
+        isAvailable: PropTypes.bool
+    }),
+    toggleFunction: PropTypes.func
+};
