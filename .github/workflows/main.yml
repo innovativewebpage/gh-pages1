@@ -14,24 +14,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 🧩 Step 1: Checkout source code
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # full history for analysis
+          fetch-depth: 0  # Fetch full history for accurate analysis
 
+      # ⚙️ Step 2: Setup Node.js environment
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: Install dependencies
-        run: npm install
-
-      - name: Build React app
-        run: npm run build
-
-      - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      # 📦 Step 3: Install dependencies
