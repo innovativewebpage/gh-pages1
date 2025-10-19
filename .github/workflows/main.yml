@@ -61,11 +61,3 @@ jobs:
           aws cloudfront create-invalidation \
             --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
             --paths "/*"
-
-      - name: Debug GitHub secrets (temporary)
-        run: |
-          echo "✅ Checking secrets and environment..."
-          echo "AWS_REGION = ${{ secrets.AWS_REGION }}"
-          echo "S3_BUCKET = ${{ secrets.S3_BUCKET }}"
-          echo "CLOUDFRONT_DISTRIBUTION_ID = ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}"
-          echo "Sonar Token (masked) = ${{ secrets.SONAR_TOKEN }}"
