@@ -1,84 +1,73 @@
-name: Build, Analyze, and Deploy React App
+name: Build and Deploy to AWS
 
 on:
   push:
-    branches: [main]
-  workflow_dispatch: # allows manual trigger from Actions tab
+    branches:
+      - main
 
 jobs:
-  build-deploy:
-    name: Build, Analyze, and Deploy
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      # --- Checkout code ---
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      # --- Setup Node environment ---
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: npm
+          node-version: '18'
 
-      # --- Install dependencies ---
       - name: Install dependencies
-        run: npm ci || npm install
+        run: npm ci
 
-      # --- Build React app ---
       - name: Build React app
-        run: CI=false npm run build
+        run: npm run build
 
-      # --- SonarCloud Scan (Non-blocking) ---
       - name: Run SonarCloud Scan
         uses: SonarSource/sonarqube-scan-action@v5.0.0
-        continue-on-error: true # Sonar failures won't stop the build
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          args: >
-            -Dsonar.host.url=https://sonarcloud.io
-            -Dsonar.organization=a-omar-rizwan
-            -Dsonar.projectKey=A.OmarRizwan_gh-pages1
-            -Dsonar.projectName=gh-pages1
-            -Dsonar.branch.name=main
-            -Dsonar.projectCreation.createIfNotExists=true
 
-      # --- Configure AWS Credentials ---
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
-      # --- Debug non-sensitive settings (Optional) ---
-      - name: Debug non-sensitive settings
+      - name: Deploy to S3
         run: |
-          echo "AWS_REGION=${{ secrets.AWS_REGION }}"
-          echo "S3_BUCKET=${{ secrets.S3_BUCKET }}"
-          echo "CLOUDFRONT_DISTRIBUTION_ID=${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}"
+          aws s3 sync build/ s3://${{ secrets.S3_BUCKET }} --delete
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
 
-      # --- Sanity checks for AWS access ---
-      - name: Verify AWS identity
-        run: aws sts get-caller-identity
-
-      - name: Verify S3 bucket
-        run: aws s3api get-bucket-location --bucket "${{ secrets.S3_BUCKET }}"
-
-      # --- Deploy to S3 ---
-      - name: Deploy build to S3
+      # 🧠 Debug step — run this once to confirm AWS + CloudFront setup
+      - name: Debug AWS identity and CloudFront (one-time)
         run: |
-          aws s3 sync ./build "s3://${{ secrets.S3_BUCKET }}" \
-            --delete --region "${{ secrets.AWS_REGION }}"
+          set -eux
+          echo "🔍 Checking which AWS account this runner is using..."
+          aws sts get-caller-identity
+          echo ""
+          echo "🧾 CloudFront Distribution ID: $CLOUDFRONT_DISTRIBUTION_ID"
+          echo "CF Dist ID length: ${#CLOUDFRONT_DISTRIBUTION_ID}"
+          echo ""
+          echo "📜 Listing all CloudFront distributions visible to this user..."
+          aws cloudfront list-distributions --query "DistributionList.Items[].{Id:Id,Domain:DomainName}" --output table || echo "⚠️ No distributions found!"
+          echo ""
+          echo "🔎 Fetching distribution details by ID..."
+          aws cloudfront get-distribution --id "$CLOUDFRONT_DISTRIBUTION_ID" --no-paginate || echo "❌ Distribution not found or permission denied!"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+          CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
 
-      # --- Invalidate CloudFront Cache ---
+      # 🚀 CloudFront invalidation (final deployment step)
       - name: Invalidate CloudFront cache
         run: |
+          echo "🚀 Invalidating CloudFront cache for distribution: $CLOUDFRONT_DISTRIBUTION_ID"
           aws cloudfront create-invalidation \
-            --distribution-id "${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}" \
+            --distribution-id "${CLOUDFRONT_DISTRIBUTION_ID}" \
             --paths "/*"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+          CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
