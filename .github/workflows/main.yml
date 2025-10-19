@@ -16,7 +16,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: "18"
 
       - name: Install dependencies
         run: npm ci
@@ -29,6 +29,15 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+        with:
+          args: >
+            -Dsonar.host.url=https://sonarcloud.io
+            -Dsonar.organization=innovativewebpage
+            -Dsonar.projectKey=innovativewebpage_gh-pages1
+            -Dsonar.projectName=gh-pages1
+            -Dsonar.branch.name=main
+            -Dsonar.projectCreation.createIfNotExists=true
 
       - name: Deploy to S3
         run: |
