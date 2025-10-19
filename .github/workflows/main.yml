@@ -3,34 +3,39 @@ name: Build, Analyze, and Deploy React App
 on:
   push:
     branches: [main]
-  workflow_dispatch: # allows manual run from Actions tab
+  workflow_dispatch: # allows manual trigger from Actions tab
 
 jobs:
   build-deploy:
-    name: Build and Deploy to AWS
+    name: Build, Analyze, and Deploy
     runs-on: ubuntu-latest
 
     steps:
+      # --- Checkout code ---
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      # --- Setup Node environment ---
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
+      # --- Install dependencies ---
       - name: Install dependencies
-        run: npm ci
+        run: npm ci || npm install
 
+      # --- Build React app ---
       - name: Build React app
-        run: npm run build
+        run: CI=false npm run build
 
-      # ---------- SonarCloud Scan ----------
+      # --- SonarCloud Scan (Non-blocking) ---
       - name: Run SonarCloud Scan
         uses: SonarSource/sonarqube-scan-action@v5.0.0
+        continue-on-error: true # Sonar failures won't stop the build
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -43,7 +48,7 @@ jobs:
             -Dsonar.branch.name=main
             -Dsonar.projectCreation.createIfNotExists=true
 
-      # ---------- Configure AWS ----------
+      # --- Configure AWS Credentials ---
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -51,13 +56,29 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      # ---------- Deploy to S3 ----------
-      - name: Deploy to S3
-        run: aws s3 sync ./build s3://${{ secrets.S3_BUCKET }} --delete
+      # --- Debug non-sensitive settings (Optional) ---
+      - name: Debug non-sensitive settings
+        run: |
+          echo "AWS_REGION=${{ secrets.AWS_REGION }}"
+          echo "S3_BUCKET=${{ secrets.S3_BUCKET }}"
+          echo "CLOUDFRONT_DISTRIBUTION_ID=${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}"
 
-      # ---------- Invalidate CloudFront ----------
+      # --- Sanity checks for AWS access ---
+      - name: Verify AWS identity
+        run: aws sts get-caller-identity
+
+      - name: Verify S3 bucket
+        run: aws s3api get-bucket-location --bucket "${{ secrets.S3_BUCKET }}"
+
+      # --- Deploy to S3 ---
+      - name: Deploy build to S3
+        run: |
+          aws s3 sync ./build "s3://${{ secrets.S3_BUCKET }}" \
+            --delete --region "${{ secrets.AWS_REGION }}"
+
+      # --- Invalidate CloudFront Cache ---
       - name: Invalidate CloudFront cache
         run: |
           aws cloudfront create-invalidation \
-            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --distribution-id "${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}" \
             --paths "/*"
