@@ -32,12 +32,6 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-    args: >
-      -Dsonar.organization=a-omar-rizwan
-      -Dsonar.projectKey=A.OmarRizwan_gh-pages1
-      -Dsonar.branch.name=main
-          
 
       - name: Deploy to S3
         run: |
