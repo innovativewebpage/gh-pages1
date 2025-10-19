@@ -28,7 +28,7 @@ jobs:
         run: npm run build
 
       - name: Run SonarCloud Scan
-        uses: SonarSource/sonarqube-scan-action@1b6bdb50b48e1a34a53cf981acb8f92ec1227a1d
+        uses: SonarSource/sonarqube-scan-action@a3f7853e3e7eae50a1b290b28b367725e4b97d0f
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
