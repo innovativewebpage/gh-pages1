@@ -1,25 +1,31 @@
-name: Build and Deploy to AWS
+name: Build and Analyze with SonarCloud
 
 on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   build:
+    name: Build and SonarCloud Scan
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: 20
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Build React app
         run: npm run build
@@ -29,7 +35,6 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
         with:
           args: >
             -Dsonar.host.url=https://sonarcloud.io
@@ -38,45 +43,3 @@ jobs:
             -Dsonar.projectName=gh-pages1
             -Dsonar.branch.name=main
             -Dsonar.projectCreation.createIfNotExists=true
-
-      - name: Deploy to S3
-        run: |
-          aws s3 sync build/ s3://${{ secrets.S3_BUCKET }} --delete
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
-
-      # 🧠 Debug step — run this once to confirm AWS + CloudFront setup
-      - name: Debug AWS identity and CloudFront (one-time)
-        run: |
-          set -eux
-          echo "🔍 Checking which AWS account this runner is using..."
-          aws sts get-caller-identity
-          echo ""
-          echo "🧾 CloudFront Distribution ID: $CLOUDFRONT_DISTRIBUTION_ID"
-          echo "CF Dist ID length: ${#CLOUDFRONT_DISTRIBUTION_ID}"
-          echo ""
-          echo "📜 Listing all CloudFront distributions visible to this user..."
-          aws cloudfront list-distributions --query "DistributionList.Items[].{Id:Id,Domain:DomainName}" --output table || echo "⚠️ No distributions found!"
-          echo ""
-          echo "🔎 Fetching distribution details by ID..."
-          aws cloudfront get-distribution --id "$CLOUDFRONT_DISTRIBUTION_ID" --no-paginate || echo "❌ Distribution not found or permission denied!"
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
-          CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
-
-      # 🚀 CloudFront invalidation (final deployment step)
-      - name: Invalidate CloudFront cache
-        run: |
-          echo "🚀 Invalidating CloudFront cache for distribution: $CLOUDFRONT_DISTRIBUTION_ID"
-          aws cloudfront create-invalidation \
-            --distribution-id "${CLOUDFRONT_DISTRIBUTION_ID}" \
-            --paths "/*"
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
-          CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
