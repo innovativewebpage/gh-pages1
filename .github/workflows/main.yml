@@ -7,7 +7,7 @@ on:
   pull_request:
     branches:
       - main
-  workflow_dispatch:  # allows manual runs
+  workflow_dispatch:
 
 jobs:
   build:
@@ -45,7 +45,7 @@ jobs:
             -Dsonar.branch.name=main
             -Dsonar.projectCreation.createIfNotExists=true
 
-      # ✅ Deploy build folder to AWS S3
+      # ✅ Deploy build folder to AWS S3 (NO CloudFront)
       - name: Deploy to S3
         run: |
           aws s3 sync build/ s3://$S3_BUCKET --delete
@@ -54,16 +54,3 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
           S3_BUCKET: ${{ secrets.S3_BUCKET }}
-
-      # ✅ Invalidate CloudFront cache
-      - name: Invalidate CloudFront cache
-        run: |
-          echo "Invalidating CloudFront cache for $CLOUDFRONT_DISTRIBUTION_ID"
-          aws cloudfront create-invalidation \
-            --distribution-id $CLOUDFRONT_DISTRIBUTION_ID \
-            --paths "/*"
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
-          CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
